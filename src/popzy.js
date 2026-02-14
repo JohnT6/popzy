@@ -1,20 +1,39 @@
 Popzy.element = [];
 
 function Popzy(options = {}) {
+    if (!options.content && !options.templateId) {
+        console.error(`Phải có "content" hoặc "templateId"`);
+        return;
+    }
+
+    if (options.content && options.templateId) {
+        options.templateId = null;
+        console.warn(`Nếu có cả "content" và "templateId" thì "content" sẽ đc ưu tiên và "templateId" sẽ bị bỏ qua`);
+        
+    }
+
+    if(options.templateId) {
+        this.template = document.querySelector(`#${options.templateId}`);
+
+        if (!this.template) {
+            console.error(`${options.templateId} không tồn tại`);
+        }
+    }
+
     this.opt = Object.assign(
         {
+            enableScrollLock: true,
             closeMethods: ["button", "overlay", "escape"],
             destroyOnClose: true,
             cssClass: [],
             footer: false,
+            scrollLockTarget: () => document.body,
         },
         options,
     );
-    this.template = document.querySelector(`#${this.opt.templateId}`);
 
-    if (!this.template) {
-        console.error(`${this.opt.templateId} không tồn tại`);
-    }
+    this.content = this.opt.content;
+    
 
     this._allowButtonClose = this.opt.closeMethods.includes("button");
     this._allowBackdropClose = this.opt.closeMethods.includes("overlay");
@@ -26,7 +45,12 @@ function Popzy(options = {}) {
 }
 
 Popzy.prototype._build = function () {
-    const content = this.template.content.cloneNode(true);
+    const contentNode = this.content ? document.createElement('div')  :this.template.content.cloneNode(true);
+    
+    if(this.content) {
+        contentNode.innerHTML = this.content;
+    }
+
 
     this._backdrop = document.createElement("div");
     this._backdrop.className = "popzy__backdrop ";
@@ -48,13 +72,15 @@ Popzy.prototype._build = function () {
         container.appendChild(btnClose);
     }
 
-    const modalContent = document.createElement("div");
-    modalContent.className = "popzy__content";
+    this._modalContent = document.createElement("div");
+    this._modalContent.className = "popzy__content";
 
-    modalContent.append(content);
+    
+    this._modalContent.append(contentNode);
+    
 
     // append Element
-    container.append(modalContent);
+    container.append(this._modalContent);
 
     if (this.opt.footer) {
         this._modalFooter = document.createElement("div");
@@ -70,6 +96,14 @@ Popzy.prototype._build = function () {
     this._backdrop.append(container);
     document.body.append(this._backdrop);
 };
+
+Popzy.prototype.setContent = function(content) {
+    this.content = content;
+
+    if(this._modalContent) {
+        this._modalContent.innerHTML = this.content;
+    }
+}
 
 Popzy.prototype.setFooterContent = function (html) {
     this._footerContent = html;
@@ -119,8 +153,17 @@ Popzy.prototype.open = function () {
     }, 0);
 
     // Disable scroll
-    document.body.classList.add("popzy--no-scroll");
-    document.body.style.paddingRight = this._getScrollbarWidth() + "px";
+    if(this.opt.enableScrollLock) {
+        const target = this.opt.scrollLockTarget();
+
+        if(this._hasScrollBar(target)){
+            target.classList.add("popzy--no-scroll");
+            const targetPadRight = parseInt(getComputedStyle(target).paddingRight);
+            
+            target.style.paddingRight = targetPadRight + this._getScrollbarWidth() + "px";
+
+        }
+    }
 
     // Overlay Close
     if (this._allowBackdropClose) {
@@ -168,9 +211,13 @@ Popzy.prototype.close = function (destroy = this.opt.destroyOnClose) {
             this._modalFooter = null;
         }
 
-        if (!Popzy.element.length) {
-            document.body.classList.remove("popzy--no-scroll");
-            document.body.style.paddingRight = "";
+        if (this.opt.enableScrollLock && !Popzy.element.length) {
+            const target = this.opt.scrollLockTarget();
+
+             if(this._hasScrollBar(target)) {
+                target.classList.remove("popzy--no-scroll");
+                target.style.paddingRight = "";
+             }
         }
 
         if (typeof this.opt.onClose === "function") this.opt.onClose();
@@ -180,6 +227,10 @@ Popzy.prototype.close = function (destroy = this.opt.destroyOnClose) {
 Popzy.prototype.destroy = function () {
     this.close(true);
 };
+
+Popzy.prototype._hasScrollBar = function(target) {
+    return target.scrollHeight > target.clientHeight;
+}
 
 Popzy.prototype._getScrollbarWidth = function () {
     if (this._scrollBarWidth) return this._scrollBarWidth;
