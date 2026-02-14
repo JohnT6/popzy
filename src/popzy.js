@@ -153,7 +153,7 @@ Popzy.prototype.open = function () {
     }, 0);
 
     // Disable scroll
-    if(this.opt.enableScrollLock) {
+    if(Popzy.element.length === 1 && this.opt.enableScrollLock) {
         const target = this.opt.scrollLockTarget();
 
         if(this._hasScrollBar(target)){
